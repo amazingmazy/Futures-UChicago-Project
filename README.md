@@ -101,7 +101,9 @@ The intended/draft repository structure is:
 Futures-UChicago-Project/
 │
 ├── README.md
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
+├── .python-version
 ├── .gitignore
 ├── .env.example
 │
@@ -130,6 +132,8 @@ Futures-UChicago-Project/
 │   ├── figures/
 │   └── tables/
 │
+├── references/
+│
 └── docs/
 ```
 
@@ -148,10 +152,12 @@ cd Futures-UChicago-Project
 
 ### 2. Install dependencies
 
-Install dependencies from the `requirements.txt` file:
+This project uses [`uv`](https://docs.astral.sh/uv/) for dependency and environment management. If you do not have it installed, follow the instructions in the `uv` documentation.
+
+The required Python version is pinned in `.python-version` (3.14), and `uv` will automatically provision a matching interpreter. Create the virtual environment and install all dependencies from `pyproject.toml` / `uv.lock` with:
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 3. Set up environment variables
@@ -175,7 +181,7 @@ Do not commit `.env` to GitHub.
 The final command may change, but the intended workflow is:
 
 ```bash
-python -m src.data.pull_databento
+uv run python -m src.data.pull_databento
 ```
 
 This should download or update the relevant futures data and store it in the local `data/` folder.
@@ -185,9 +191,9 @@ This should download or update the relevant futures data and store it in the loc
 The intended workflow is:
 
 ```bash
-python -m src.analysis.exploratory_analysis
-python -m src.models.spread_model
-python -m src.strategy.backtest
+uv run python -m src.analysis.exploratory_analysis
+uv run python -m src.models.spread_model
+uv run python -m src.strategy.backtest
 ```
 
 The notebooks in `notebooks/` may also be used to reproduce exploratory plots and intermediate findings.

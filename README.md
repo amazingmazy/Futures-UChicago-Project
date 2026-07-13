@@ -53,9 +53,20 @@ The main goal of this stage is to answer: **Which two futures contracts should w
 
 The initial candidate pair is Fed Funds futures versus SOFR futures because both are closely tied to short-term interest rate expectations.
 
+Assess the pairs rigorously using the following:
+
+- Engle–Granger cointegration test
+- Augmented Dickey-Fuller test
+- Analysis of half-life
+- Analysis of long-term two-way regression
+- Analysis of return correlation
+- Staleness
+
+These considerations will guide our selection of a pair candidate.
+
 ### 4. Model the Normal Relationship Between the Selected Futures Pair
 
-After selecting a pair, we will estimate how the two contracts normally move together. A simple baseline model may use regression or cointegration methods to estimate a hedge ratio and spread. The hedge ratio tells us how much of one contract should be held against the other to create a balanced relative-value trade. The spread measures how far the pair is from its normal relationship. We may extend the baseline model to a Bayesian or time-varying model that allows the relationship between the contracts to change over time.
+After selecting a pair, we will estimate how the two contracts normally move together. A simple baseline model may use regression or cointegration methods to estimate a hedge ratio and spread. The hedge ratio tells us how much of one contract should be held against the other to create a balanced relative-value trade. The spread measures how far the pair is from its normal relationship. We may extend the baseline model to a Bayesian or time-varying model that allows the relationship between the contracts to change over time, the latter will be useful in the case that there is varying term structures of the contracts.
 
 ### 5. Signal Generation and Strategy Logic
 
@@ -65,11 +76,11 @@ Once the spread is constructed, we will convert it into trading signals. A simpl
 * Go long the relatively cheap contract and short the relatively expensive contract.
 * Exit when the spread returns closer to normal.
 
-The goal is to create a market-neutral strategy that focuses on relative mispricing rather than the overall direction of interest rates.
+The goal is to create a market-neutral strategy that focuses on relative mispricing rather than the overall direction of interest rates. We may explore other signal constructions in order to achieve this goal, a z-score based signal is often used because of it's statistical informed foundation, however alternative signals may capture better.
 
 ### 6. Performance Evaluation
 
-The final stage will evaluate whether the strategy performs well after accounting for risk and realistic trading assumptions.
+The final stage will evaluate whether the strategy performs well after accounting for risk and realistic trading assumptions. Rigorously backtest the strategy against not only historical data, and consider some use of synthetic or resampling of data. With the goal of being market neutral, analyze performance across regimes.
 
 ## Issue Roadmap
 

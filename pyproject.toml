@@ -1,10 +1,29 @@
 [project]
 name = "futures-uchicago-project"
 version = "0.1.0"
-description = "Add your description here"
+description = "Relative-value trading in CME interest-rate futures"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "databento>=0.81.0",
     "python-dotenv>=1.2.2",
+    # Declared explicitly rather than relied on as transitive deps of databento.
+    # src/data/ingest.py imports pandas and requests directly, and to_parquet()
+    # needs pyarrow -- if databento ever drops any of them, we break.
+    "pandas>=2.2",
+    "requests>=2.32",
+    "pyarrow>=17.0",
+    # Added for issue #3 (EDA / pair selection).
+    "statsmodels>=0.14",
+    "matplotlib>=3.9",
+    "scipy>=1.14",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

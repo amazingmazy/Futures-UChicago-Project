@@ -34,6 +34,7 @@ from src.analysis.exploratory_analysis import (
     half_life,
     rank_pairs,
     rolling_beta,
+    spread_volatility_by_year,
     to_rate_space,
 )
 
@@ -390,3 +391,19 @@ def test_compare_spread_constructions_reports_all_three() -> None:
     assert constructions.loc["dv01_neutral", "beta"] == pytest.approx(0.60, abs=0.01)
     assert constructions.loc["dv01_neutral", "is_dv01_neutral"]
     assert not constructions.loc["raw_1to1", "is_dv01_neutral"]
+
+
+def test_spread_volatility_by_year_respects_pair_and_scale(
+    cointegrated_pair: pd.DataFrame,
+) -> None:
+    """The yearly-dispersion table works for an arbitrary pair, not just ZQ/SR3.
+
+    With ``scale=1.0`` the values are the spread's own units (as for CL/BZ in
+    $/bbl); the default basis-point scaling should be exactly 100x that.
+    """
+    yearly = spread_volatility_by_year(cointegrated_pair, "AA", "BB", scale=1.0)
+    yearly_bp = spread_volatility_by_year(cointegrated_pair, "AA", "BB")
+
+    assert (yearly.index == sorted(set(cointegrated_pair.index.year))).all()
+    assert (yearly > 0).all()
+    pd.testing.assert_series_equal(yearly_bp, yearly * 100.0)

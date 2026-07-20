@@ -125,11 +125,19 @@ def main(start: str = "2015-01-01", end: str = "2026-07-01") -> None:
     client = get_client()
     raw_by_root = {}
     for root in ROOTS:
+        raw_path = RAW_DIR / f"{root}.c.0.parquet"
+        if raw_path.exists():
+            # Resume support: a root's parquet is only written after its fetch
+            # completes, so an existing file is a finished download - reuse it
+            # rather than re-pulling (delete the file to force a refetch).
+            print(f"Skipping {root}.c.0 (found {raw_path})")
+            raw_by_root[root] = pd.read_parquet(raw_path)
+            continue
         print(f"Fetching {root}.c.0 ({start} to {end})...")
         df = fetch_continuous_daily(client, root, start, end)
         # Raw per-symbol pull, unmodified aside from concatenation - keeps the
         # exact statistics records (all stat types) Databento returns.
-        df.to_parquet(RAW_DIR / f"{root}.c.0.parquet")
+        df.to_parquet(raw_path)
         raw_by_root[root] = df
 
     # Processed settlement-price panel: the single file downstream EDA/modeling

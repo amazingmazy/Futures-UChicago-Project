@@ -3,24 +3,26 @@
 Answers the question issue #3 poses: *which two futures contracts should we
 model and potentially trade against each other?*
 
-**Recommendation: ZQ/SR3 (Fed Funds vs SOFR)** -- the pair the README assumed.
+**Recommendation: ZQ/SR3 (Fed Funds vs SOFR)** -- the pair the README assumed,
+now analysed on official CME settlement prices rather than last-trade closes.
 It is the strongest of the candidates by a wide margin, but the recommendation
 comes with a real qualification that the numbers below force, and that is worth
 stating up front rather than burying:
 
-**No candidate pair is cointegrated in the post-2022 regime.** Every pair,
+**No candidate pair is cointegrated in the post-2023 regime.** Every pair,
 including the recommended one, fails Engle-Granger once the sample is truncated
-to 2022 onward. ZQ/SR3 goes from p = 0.0000 on 2018-2021 data to p = 0.06 from
-2022 and p = 0.28 from 2023. The curve pairs are worse and never pass at all
-(ZT/ZF and ZF/ZN sit at p ~ 0.36 even on the full sample; ZN/ZB's apparent
-full-sample pass at p = 0.054 collapses to p = 0.31-0.54 on every later window,
+to 2023 onward. ZQ/SR3 goes from p = 0.0003 on the full sample to p = 0.0131
+from 2022 and p = 0.2299 from 2023. The curve pairs are worse and never pass at
+all (ZT/ZF and ZF/ZN sit at p ~ 0.36-0.38 even on the full sample; ZN/ZB's apparent
+full-sample pass at p = 0.046 collapses to p = 0.31-0.50 on every later window,
 so it is an artifact of the quiet 2015-2017 period).
 
 ZQ/SR3 is still the right choice -- it is the only pair with a strong result on
-any window, it has the shortest half-life by a factor of six, and it is the only
-one with a clear economic reason to be related. But "cointegrated" is a claim
-about the 2018-2021 sample, not about today, and issue #4 should not assume the
-relationship it fits will hold out of sample.
+any window, it has the shortest half-life (the Treasury pairs' are seven to
+twelve times longer), and it is the only one with a clear economic reason to be
+related. But "cointegrated" is a claim about the 2018-2021 sample, not about
+today, and issue #4 should not assume the relationship it fits will hold out of
+sample.
 
 Beyond that, three hazards in ZQ/SR3 that nothing in the pipeline currently
 surfaces, and that will silently corrupt issue #4 if it estimates a hedge ratio
@@ -30,21 +32,21 @@ without knowing them:
    before then. ``src/data/ingest.py`` requests 2015 onward, receives empty
    responses for 2015-2017, appends the empty frames without comment, and the
    resulting NaNs are indistinguishable from missing data. The usable ZQ/SR3
-   overlap is 1,645 days -- roughly half the 2,983 available for ZN/ZB.
+   overlap is 2,052 days -- roughly two-thirds of what the Treasury pairs have.
 
-2. **Both legs are stale about 40% of the time.** ZQ posts an unchanged close on
-   46% of days and SR3 on 38%, because front-month short-rate contracts are
-   pinned to a policy rate that only moves at eight scheduled FOMC meetings a
-   year. Every Treasury root is stale on under 5% of days. This is what produces
-   the pathological signature in the ranking table: an R-squared of 0.99 on
-   levels alongside a daily-change correlation of 0.10.
+2. **Both legs are stale roughly half the time.** ZQ posts an unchanged
+   settlement on 57% of days and SR3 on 37%, because front-month short-rate
+   contracts are pinned to a policy rate that only moves at eight scheduled FOMC
+   meetings a year. Every Treasury root is stale on under 5% of days. This is
+   what produces the pathological signature in the ranking table: an R-squared
+   of 0.99 on levels alongside a daily-change correlation of 0.01.
 
 3. **The stationary spread is the unhedged one.** This is the important one. ZQ
    and SR3 have different DV01s ($41.67 vs $25.00 per basis point), so a 1:1
    spread carries net exposure to the *level* of rates -- exactly the directional
    risk a market-neutral strategy is supposed to remove. But the DV01-neutral
-   spread (beta = 0.60) is **not stationary**: ADF p = 0.74, half-life 277 days.
-   The 1:1 spread is (ADF p = 0.0000, half-life 10 days). The spread that
+   spread (beta = 0.60) is **not stationary**: ADF p = 0.75, half-life 302 days.
+   The 1:1 spread is (ADF p = 0.0000, half-life 12 days). The spread that
    mean-reverts is not hedged; the spread that is hedged does not mean-revert.
    Issue #4 has to choose, and should choose deliberately.
 
@@ -78,7 +80,7 @@ PROCESSED_DIR = ROOT_DIR / "data" / "processed"
 FIGURES_DIR = ROOT_DIR / "outputs" / "figures"
 TABLES_DIR = ROOT_DIR / "outputs" / "tables"
 
-PANEL_PATH = PROCESSED_DIR / "continuous_close_prices.parquet"
+PANEL_PATH = PROCESSED_DIR / "continuous_settlement_prices.parquet"
 
 #: Roots quoted as ``100 - rate`` rather than as a price. Everything else in the
 #: panel is a price (Treasury points, $/bbl, $/gal).
@@ -123,7 +125,7 @@ BP_PER_PRICE_POINT = 100.0
 
 
 def load_panel(path: Path = PANEL_PATH) -> pd.DataFrame:
-    """Load the wide close-price panel written by ``src.data.ingest``.
+    """Load the wide settlement-price panel written by ``src.data.ingest``.
 
     Raises a pointed error rather than a bare ``FileNotFoundError``, so a
     teammate who clones the repo and runs this first is told what to do next.
@@ -138,18 +140,14 @@ def load_panel(path: Path = PANEL_PATH) -> pd.DataFrame:
 
 
 def drop_sunday_session(panel: pd.DataFrame) -> pd.DataFrame:
-    """Drop the Sunday-evening Globex session rows.
+    """Drop any Sunday-evening Globex session rows.
 
-    CME Globex reopens Sunday evening US time, so the ``ohlcv-1d`` schema emits a
-    bar dated Sunday. Those bars are genuine, but they are thin and populated
-    *inconsistently across roots*: ZQ has no Sunday close on 55% of Sundays,
-    while ZN has one on 94% of them. Because ``build_close_panel`` aligns roots
-    on the union of their indices, keeping Sundays injects hundreds of spurious
-    NaNs and makes coverage look far worse than it is.
-
-    Dropping them takes ZQ from 345 missing observations to 20, and ZN and ZB
-    from 36 and 51 to 2 each. Every "missing" date the ingestion warnings flagged
-    in Feb 2026 is a Sunday.
+    CME Globex reopens Sunday evening US time, so bar-style schemas emit rows
+    dated Sunday, populated inconsistently across roots, which injects spurious
+    NaNs when the panel aligns roots on the union of their indices. The
+    settlement panel keys rows by settlement session date and contains no
+    Sundays, so this is a no-op there -- kept as a cheap guard in case the
+    panel is ever rebuilt from a bar schema again.
     """
     return panel.loc[panel.index.dayofweek != 6]
 
@@ -170,10 +168,10 @@ def to_rate_space(series: pd.Series, root: str) -> pd.Series:
 def coverage_report(panel: pd.DataFrame) -> pd.DataFrame:
     """Per-root coverage: first and last observation, missing count, staleness.
 
-    ``stale_frac`` -- the fraction of days on which the close did not change --
-    is the most diagnostic column here, and nothing in the ingestion step
-    surfaces it. It explains why the ZQ/SR3 daily-change correlation is 0.10
-    despite a level R-squared of 0.99.
+    ``stale_frac`` -- the fraction of days on which the settlement did not
+    change -- is the most diagnostic column here, and nothing in the ingestion
+    step surfaces it. It explains why the ZQ/SR3 daily-change correlation is
+    0.01 despite a level R-squared of 0.99.
     """
     rows = []
     for root in panel.columns:
@@ -248,9 +246,9 @@ def rolling_beta(y: pd.Series, x: pd.Series, window: int = ROLLING_WINDOW) -> pd
 
     A pair whose beta is flat supports a single static hedge ratio, which is what
     issue #4's baseline model assumes. A pair whose beta wanders does not:
-    ZQ/SR3's rolling beta ranges from 0.27 to 1.36, a factor of five. That is a
-    concrete argument for the time-varying/Bayesian extension the README lists as
-    optional. For this pair it is not optional.
+    ZQ/SR3's rolling beta ranges from -0.46 to +2.40 -- it even changes sign.
+    That is a concrete argument for the time-varying/Bayesian extension the
+    README lists as optional. For this pair it is not optional.
     """
     betas: list[float] = []
     index: list[pd.Timestamp] = []
@@ -287,7 +285,7 @@ def analyse_pair(panel: pd.DataFrame, leg_a: str, leg_b: str) -> tuple[PairStats
     # show a high level correlation whether or not they actually co-move, so a
     # level-based screen would rank almost everything as a good pair. The change
     # correlation is what reveals that ZQ and SR3 barely move together day to day
-    # (0.10) even though their levels track almost perfectly.
+    # (0.01) even though their levels track almost perfectly.
     changes = both.diff().dropna()
     change_corr = float(changes[leg_a].corr(changes[leg_b]))
 
@@ -333,15 +331,15 @@ def cointegration_robustness(
     """Re-run Engle-Granger on progressively later subsamples.
 
     This is the test that separates a real relationship from a lucky one, and it
-    is the most uncomfortable table in the analysis: **every pair fails from 2022
+    is the most uncomfortable table in the analysis: **every pair fails from 2023
     onward**, including the one we recommend.
 
-    ZQ/SR3:  0.0000 -> 0.0000 -> 0.0618 -> 0.2799
-    ZN/ZB:   0.0543 -> 0.5368 -> 0.3062 -> 0.4601
-    ZT/ZF:   0.3634 -> 0.5012 -> 0.7219 -> 0.7634
+    ZQ/SR3:  0.0003 -> 0.0003 -> 0.0131 -> 0.2299
+    ZN/ZB:   0.0463 -> 0.5030 -> 0.3151 -> 0.4880
+    ZT/ZF:   0.3808 -> 0.5035 -> 0.7350 -> 0.6993
 
     Two different things are going on. ZN/ZB never had a relationship: its
-    marginal full-sample pass (0.054) is carried entirely by the quiet 2015-2017
+    marginal full-sample pass (0.046) is carried entirely by the quiet 2015-2017
     window and collapses the moment that window is dropped. ZQ/SR3 *did* have
     one, strongly, and it has weakened -- which is what one would expect after
     the 2022-23 hiking cycle repriced the front end and SOFR's liquidity
@@ -378,13 +376,13 @@ def compare_spread_constructions(panel: pd.DataFrame) -> pd.DataFrame:
     know before it estimates anything.
 
     * **raw_1to1** -- one ZQ against one SR3. Stationary (ADF p = 0.0000),
-      half-life about 10 days. But the legs have different DV01s, so this book is
+      half-life about 12 days. But the legs have different DV01s, so this book is
       long or short the *level* of rates: it is not market-neutral.
     * **ols_beta** -- beta = 0.986, essentially 1:1. Same properties and the same
       problem. The regression recovers the unhedged ratio precisely because that
       is the combination that happens to be stationary.
     * **dv01_neutral** -- beta = 0.60, the ratio that actually neutralises rate
-      exposure. And it is **not stationary**: ADF p = 0.74, half-life 277 days.
+      exposure. And it is **not stationary**: ADF p = 0.75, half-life 302 days.
 
     So the spread that mean-reverts is not hedged, and the spread that is hedged
     does not mean-revert. No construction gives both. Whichever issue #4 picks, it
@@ -425,8 +423,8 @@ def spread_volatility_by_year(panel: pd.DataFrame) -> pd.Series:
 
     Included because a static z-score threshold -- the entry rule issue #5
     proposes -- assumes the spread's dispersion is roughly constant. It is not.
-    2021 (ZIRP, both legs frozen) has a standard deviation of 1.45bp; 2022 (the
-    hiking cycle) has 39.34bp. That is a 27x swing. A ``|z| > 2`` rule calibrated
+    2021 (ZIRP, both legs frozen) has a standard deviation of ~1.5bp; 2022 (the
+    hiking cycle) has ~40bp. That is a ~27x swing. A ``|z| > 2`` rule calibrated
     on the full sample will essentially never fire in 2021 and will fire
     constantly in 2022. Issue #5 should use a rolling mean and standard
     deviation, not full-sample ones.
@@ -454,7 +452,7 @@ def plot_normalised_levels(panel: pd.DataFrame, path: Path) -> None:
         if series.empty:
             continue
         ax.plot(series.index, 100 * series / series.iloc[0], label=root, linewidth=1.1)
-    ax.set_title("Continuous front-month closes, rebased to 100 at each root's first observation")
+    ax.set_title("Continuous front-month settlements, rebased to 100 at each root's first observation")
     ax.set_ylabel("Index (first observation = 100)")
     ax.legend(ncol=4, fontsize=9)
     ax.grid(alpha=0.25)
@@ -496,11 +494,11 @@ def plot_change_correlation(panel: pd.DataFrame, path: Path) -> None:
 
 
 def plot_staleness(coverage: pd.DataFrame, path: Path) -> None:
-    """Fraction of days on which each root's close did not move.
+    """Fraction of days on which each root's settlement did not move.
 
-    The single most important diagnostic in this analysis. ZQ and SR3 sit at 46%
-    and 38%; every other root is under 5%. This is why the ZQ/SR3 daily-change
-    correlation is 0.10 despite a level R-squared of 0.99, and it is the main
+    The single most important diagnostic in this analysis. ZQ and SR3 sit at 57%
+    and 37%; every other root is under 5%. This is why the ZQ/SR3 daily-change
+    correlation is 0.01 despite a level R-squared of 0.99, and it is the main
     caveat attached to the recommended pair.
     """
     ordered = coverage["stale_frac"].sort_values(ascending=False)
@@ -607,8 +605,8 @@ def plot_rolling_beta(panel: pd.DataFrame, pairs: list[tuple[str, str]], path: P
     """Rolling hedge ratio for every pair -- the stability check.
 
     A flat line supports a single static hedge ratio. ZQ/SR3's line is not flat:
-    it swings from 0.27 to 1.36. That is the argument for the time-varying model
-    the README lists as an optional extension.
+    it swings from -0.46 to +2.40. That is the argument for the time-varying
+    model the README lists as an optional extension.
 
     CL/HO's beta is around 23 (crude in $/bbl against heating oil in $/gal) and
     would compress every other line to a flat streak, so the y-axis is clipped.
@@ -621,7 +619,7 @@ def plot_rolling_beta(panel: pd.DataFrame, pairs: list[tuple[str, str]], path: P
         rolling = rolling_beta(y, x)
         if not rolling.empty:
             ax.plot(rolling.index, rolling.to_numpy(), label=f"{leg_a}/{leg_b}", linewidth=1.2)
-    ax.set_ylim(-0.2, 1.6)  # clips CL/HO (beta ~ 23); see docstring
+    ax.set_ylim(-0.6, 2.6)  # clips CL/HO (beta ~ 23); see docstring
     ax.set_title(f"Rolling {ROLLING_WINDOW}-day OLS hedge ratio (y-axis clipped; CL/HO is off-scale)")
     ax.set_ylabel("beta")
     ax.legend(fontsize=9)
@@ -661,7 +659,7 @@ def main() -> None:
     robustness.to_csv(TABLES_DIR / "cointegration_robustness.csv")
     print("\n=== ENGLE-GRANGER p-VALUE BY SUBSAMPLE START ===")
     print(robustness.to_string(float_format=lambda v: f"{v:.4f}"))
-    print("  NOTE: every pair fails from 2022 onward, including ZQ/SR3 (0.0000 -> 0.28).")
+    print("  NOTE: every pair fails from 2023 onward, including ZQ/SR3 (0.0003 -> 0.23).")
     print("  ZQ/SR3 is still the strongest candidate, but cointegration is a claim about")
     print("  2018-2021, not about today. Issue #4 should not assume it holds out of sample.")
 
@@ -675,7 +673,7 @@ def main() -> None:
     yearly.to_csv(TABLES_DIR / "spread_vol_by_year.csv")
     print("\n=== ZQ/SR3 SPREAD STANDARD DEVIATION BY YEAR (bp) ===")
     print(yearly.to_string(float_format=lambda v: f"{v:.2f}"))
-    print("  1.45bp in 2021 against 39.34bp in 2022: a static z-score threshold will not work.")
+    print("  ~1.5bp in 2021 against ~40bp in 2022: a static z-score threshold will not work.")
 
     plot_normalised_levels(panel, FIGURES_DIR / "01_levels_rebased.png")
     plot_change_correlation(panel, FIGURES_DIR / "02_change_correlation.png")

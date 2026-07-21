@@ -3,52 +3,52 @@
 Answers the question issue #3 poses: *which two futures contracts should we
 model and potentially trade against each other?*
 
-**Recommendation: ZQ/SR3 (Fed Funds vs SOFR)** -- the pair the README assumed,
-now analysed on official CME settlement prices rather than last-trade closes.
-It is the strongest of the candidates by a wide margin, but the recommendation
-comes with a real qualification that the numbers below force, and that is worth
-stating up front rather than burying:
+**Recommendation: CL/BZ (WTI vs Brent crude)** -- run on official CME
+settlement prices. It dominates every candidate on every dimension that
+matters, and it is the only pair whose cointegration survives out of the
+2018-2021 regime:
 
-**No candidate pair is cointegrated in the post-2023 regime.** Every pair,
-including the recommended one, fails Engle-Granger once the sample is truncated
-to 2023 onward. ZQ/SR3 goes from p = 0.0003 on the full sample to p = 0.0131
-from 2022 and p = 0.2299 from 2023. The curve pairs are worse and never pass at
-all (ZT/ZF and ZF/ZN sit at p ~ 0.36-0.38 even on the full sample; ZN/ZB's apparent
-full-sample pass at p = 0.046 collapses to p = 0.31-0.50 on every later window,
-so it is an artifact of the quiet 2015-2017 period).
+* Engle-Granger and ADF p = 0.0000 on the full 2015-2026 sample, and the
+  **only pair that stays under p = 0.05 on every subsample window**
+  (2015/2018/2022/2023 starts: 0.0000 / 0.0003 / 0.0087 / 0.0192). Everything
+  else -- including ZQ/SR3 -- fails from 2022 or 2023 onward.
+* **Half-life 4.1 days**, the shortest in the table (ZQ/SR3: 12.4d).
+* **beta = 0.97 with a tight rolling range (0.74-1.14)**, against ZQ/SR3's
+  -0.46 to +2.40. A static hedge ratio is defensible here.
+* Both legs quote in $/bbl on identical 1,000-barrel contracts, so the ~1:1
+  spread that is stationary is *also* (approximately) the dollar-neutral one.
+  The DV01 dilemma that plagues ZQ/SR3 (see below) never arises.
+* Staleness under 1% on both legs; full 2,894-day sample.
+* The economic story is one sentence: two grades of light sweet crude tied
+  together by a physical shipping arbitrage.
 
-ZQ/SR3 is still the right choice -- it is the only pair with a strong result on
-any window, it has the shortest half-life (the Treasury pairs' are seven to
-twelve times longer), and it is the only one with a clear economic reason to be
-related. But "cointegrated" is a claim about the 2018-2021 sample, not about
-today, and issue #4 should not assume the relationship it fits will hold out of
-sample.
+**ZQ/SR3 (Fed Funds vs SOFR), the pair the README originally assumed, is the
+runner-up** -- and on settlement prices its problems are worse than the
+close-price analysis suggested. Its hazards, kept here because they document
+why it lost:
 
-Beyond that, three hazards in ZQ/SR3 that nothing in the pipeline currently
-surfaces, and that will silently corrupt issue #4 if it estimates a hedge ratio
-without knowing them:
+1. **Cointegration decays out of sample.** EG p goes 0.0003 (full sample) ->
+   0.0131 (from 2022) -> 0.2299 (from 2023). It is a claim about 2018-2021,
+   not about today.
 
-1. **The sample starts in May 2018, not 2015.** SOFR futures did not exist
-   before then. ``src/data/ingest.py`` requests 2015 onward, receives empty
-   responses for 2015-2017, appends the empty frames without comment, and the
-   resulting NaNs are indistinguishable from missing data. The usable ZQ/SR3
-   overlap is 2,052 days -- roughly two-thirds of what the Treasury pairs have.
+2. **The sample starts in May 2018, not 2015** (SOFR futures did not exist
+   before then), so it has 2,052 usable days against CL/BZ's 2,894.
 
-2. **Both legs are stale roughly half the time.** ZQ posts an unchanged
-   settlement on 57% of days and SR3 on 37%, because front-month short-rate
-   contracts are pinned to a policy rate that only moves at eight scheduled FOMC
-   meetings a year. Every Treasury root is stale on under 5% of days. This is
-   what produces the pathological signature in the ranking table: an R-squared
-   of 0.99 on levels alongside a daily-change correlation of 0.01.
+3. **Both legs are stale much of the time** (ZQ 57%, SR3 37% of settlements
+   unchanged) because front-month short-rate contracts are pinned to a policy
+   rate that only moves at eight scheduled FOMC meetings a year. The
+   daily-change correlation is 0.01 against a level R-squared of 0.99.
 
-3. **The stationary spread is the unhedged one.** This is the important one. ZQ
-   and SR3 have different DV01s ($41.67 vs $25.00 per basis point), so a 1:1
-   spread carries net exposure to the *level* of rates -- exactly the directional
-   risk a market-neutral strategy is supposed to remove. But the DV01-neutral
-   spread (beta = 0.60) is **not stationary**: ADF p = 0.75, half-life 302 days.
-   The 1:1 spread is (ADF p = 0.0000, half-life 12 days). The spread that
-   mean-reverts is not hedged; the spread that is hedged does not mean-revert.
-   Issue #4 has to choose, and should choose deliberately.
+4. **The stationary spread is the unhedged one.** ZQ and SR3 have different
+   DV01s ($41.67 vs $25.00 per basis point), so the ~1:1 spread that is
+   stationary carries net exposure to the *level* of rates, while the
+   DV01-neutral spread (beta = 0.60) is not stationary (ADF p = 0.75,
+   half-life 302 days). See ``compare_spread_constructions``. CL/BZ has no
+   analogue of this problem.
+
+The Treasury curve pairs (ZT/ZF, ZF/ZN, ZN/ZB) fail Engle-Granger outright
+(p ~ 0.36-0.40 full-sample; ZN/ZB's marginal 0.046 collapses to 0.31-0.50 on
+every later window -- an artifact of the quiet 2015-2017 period).
 
 Run with::
 
@@ -99,11 +99,12 @@ DV01_USD_PER_BP = {"ZQ": 41.67, "SR3": 25.00}
 #: as an out-of-scope control: it is useful to see what a pair of genuinely
 #: active, non-policy-linked contracts looks like on the same statistics.
 CANDIDATE_PAIRS: list[tuple[str, str]] = [
-    ("ZQ", "SR3"),  # Fed Funds vs SOFR    -- the recommendation
+    ("ZQ", "SR3"),  # Fed Funds vs SOFR    -- the original recommendation
     ("ZT", "ZF"),  # 2Y vs 5Y             -- short-end curve
     ("ZF", "ZN"),  # 5Y vs 10Y            -- belly
     ("ZN", "ZB"),  # 10Y vs 30Y           -- long-end curve
-    ("CL", "HO"),  # crude vs heating oil -- control, out of scope
+    ("CL", "HO"),  # crude vs heating oil -- control
+    ("CL", "BZ"),  # WTI vs Brent         -- same units ($/bbl), same 1,000bbl size
 ]
 
 #: Subsample start dates for the cointegration robustness check. A pair whose
@@ -171,7 +172,8 @@ def coverage_report(panel: pd.DataFrame) -> pd.DataFrame:
     ``stale_frac`` -- the fraction of days on which the settlement did not
     change -- is the most diagnostic column here, and nothing in the ingestion
     step surfaces it. It explains why the ZQ/SR3 daily-change correlation is
-    0.01 despite a level R-squared of 0.99.
+    0.01 despite a level R-squared of 0.99, and why CL/BZ (both legs under 1%
+    stale) is a cleaner pair to model.
     """
     rows = []
     for root in panel.columns:
@@ -245,10 +247,10 @@ def rolling_beta(y: pd.Series, x: pd.Series, window: int = ROLLING_WINDOW) -> pd
     """Re-estimate the hedge ratio on a rolling window.
 
     A pair whose beta is flat supports a single static hedge ratio, which is what
-    issue #4's baseline model assumes. A pair whose beta wanders does not:
-    ZQ/SR3's rolling beta ranges from -0.46 to +2.40 -- it even changes sign.
-    That is a concrete argument for the time-varying/Bayesian extension the
-    README lists as optional. For this pair it is not optional.
+    issue #4's baseline model assumes. On settlements, CL/BZ's rolling beta stays
+    in a tight 0.74-1.14 band, so a static ratio is defensible. ZQ/SR3's swings
+    from -0.46 to +2.40 -- it would need the time-varying/Bayesian extension the
+    README lists as optional.
     """
     betas: list[float] = []
     index: list[pd.Timestamp] = []
@@ -330,29 +332,25 @@ def cointegration_robustness(
 ) -> pd.DataFrame:
     """Re-run Engle-Granger on progressively later subsamples.
 
-    This is the test that separates a real relationship from a lucky one, and it
-    is the most uncomfortable table in the analysis: **every pair fails from 2023
-    onward**, including the one we recommend.
+    This is the test that separates a real relationship from a lucky one, and
+    it is what decides the recommendation. On settlement prices:
 
-    ZQ/SR3:  0.0003 -> 0.0003 -> 0.0131 -> 0.2299
-    ZN/ZB:   0.0463 -> 0.5030 -> 0.3151 -> 0.4880
-    ZT/ZF:   0.3808 -> 0.5035 -> 0.7350 -> 0.6993
+    CL/BZ:   0.0000 -> 0.0003 -> 0.0087 -> 0.0192   (passes every window)
+    ZQ/SR3:  0.0003 -> 0.0003 -> 0.0131 -> 0.2299   (fails from 2023)
+    ZN/ZB:   0.0463 -> 0.5030 -> 0.3151 -> 0.4880   (never had a relationship)
+    ZT/ZF:   0.3808 -> 0.5035 -> 0.7350 -> 0.6993   (never close)
 
-    Two different things are going on. ZN/ZB never had a relationship: its
-    marginal full-sample pass (0.046) is carried entirely by the quiet 2015-2017
-    window and collapses the moment that window is dropped. ZQ/SR3 *did* have
-    one, strongly, and it has weakened -- which is what one would expect after
-    the 2022-23 hiking cycle repriced the front end and SOFR's liquidity
-    profile changed relative to Fed Funds.
+    Three different things are going on. ZN/ZB's marginal full-sample pass is
+    carried entirely by the quiet 2015-2017 window and collapses the moment
+    that window is dropped. ZQ/SR3 *did* have a strong relationship and it has
+    weakened -- what one would expect after the 2022-23 hiking cycle repriced
+    the front end. CL/BZ holds on every window, because the relationship is
+    enforced by a physical arbitrage (shipping crude across the Atlantic)
+    rather than by a policy regime.
 
-    The honest conclusion is that ZQ/SR3 is the best available pair and the only
-    one worth modelling, but that a static full-sample hedge ratio will be
-    fitting a relationship that no longer holds as tightly. This is a direct
-    argument for the time-varying/Bayesian model the README lists as optional.
-
-    Note also that the later windows are shorter and so have less power; some
-    p-value drift is expected mechanically. What distinguishes ZN/ZB from ZQ/SR3
-    is the *size* of the move, not its direction.
+    Note that the later windows are shorter and so have less power; some
+    p-value drift is expected mechanically. What matters is staying on the
+    right side of 0.05, and only CL/BZ does.
     """
     rows = []
     for leg_a, leg_b in pairs:
@@ -389,6 +387,10 @@ def compare_spread_constructions(panel: pd.DataFrame) -> pd.DataFrame:
     should pick knowingly: a strategy on the 1:1 spread is taking directional rate
     risk it has not accounted for, and a strategy on the DV01-neutral spread has
     no mean reversion to trade.
+
+    Note: this dilemma is specific to ZQ/SR3. For CL/BZ the question does not
+    arise -- both legs are 1,000 barrels quoted in $/bbl, so the 1:1 spread and
+    the dollar-neutral spread are the same object.
     """
     both = panel[["ZQ", "SR3"]].dropna()
     zq_bp = to_rate_space(both["ZQ"], "ZQ") * BP_PER_PRICE_POINT
@@ -418,20 +420,29 @@ def compare_spread_constructions(panel: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("construction")
 
 
-def spread_volatility_by_year(panel: pd.DataFrame) -> pd.Series:
-    """Standard deviation of the ZQ/SR3 spread, year by year, in basis points.
+def spread_volatility_by_year(
+    panel: pd.DataFrame,
+    leg_a: str = "ZQ",
+    leg_b: str = "SR3",
+    scale: float = BP_PER_PRICE_POINT,
+) -> pd.Series:
+    """Standard deviation of a pair's spread, year by year.
 
     Included because a static z-score threshold -- the entry rule issue #5
-    proposes -- assumes the spread's dispersion is roughly constant. It is not.
-    2021 (ZIRP, both legs frozen) has a standard deviation of ~1.5bp; 2022 (the
-    hiking cycle) has ~40bp. That is a ~27x swing. A ``|z| > 2`` rule calibrated
+    proposes -- assumes the spread's dispersion is roughly constant. For ZQ/SR3
+    it is not: 2021 (ZIRP, both legs frozen) has a standard deviation of ~1.5bp
+    against ~40bp for 2022 (the hiking cycle). A ``|z| > 2`` rule calibrated
     on the full sample will essentially never fire in 2021 and will fire
     constantly in 2022. Issue #5 should use a rolling mean and standard
     deviation, not full-sample ones.
+
+    ``scale`` converts the spread into its quoted unit: basis points for the
+    rate-like default, 1.0 for a pair already in price units (e.g. CL/BZ in
+    $/bbl).
     """
-    _, spread = analyse_pair(panel, "ZQ", "SR3")
-    spread_bp = spread * BP_PER_PRICE_POINT
-    return spread_bp.groupby(spread_bp.index.year).std().rename("spread_std_bp")
+    _, spread = analyse_pair(panel, leg_a, leg_b)
+    scaled = spread * scale
+    return scaled.groupby(scaled.index.year).std().rename("spread_std")
 
 
 # --------------------------------------------------------------------------
@@ -498,8 +509,8 @@ def plot_staleness(coverage: pd.DataFrame, path: Path) -> None:
 
     The single most important diagnostic in this analysis. ZQ and SR3 sit at 57%
     and 37%; every other root is under 5%. This is why the ZQ/SR3 daily-change
-    correlation is 0.01 despite a level R-squared of 0.99, and it is the main
-    caveat attached to the recommended pair.
+    correlation is 0.01 despite a level R-squared of 0.99, and it is a big part
+    of why the recommendation moved away from ZQ/SR3 to CL/BZ.
     """
     ordered = coverage["stale_frac"].sort_values(ascending=False)
     colours = ["#c0392b" if value > 0.25 else "#2c7fb8" for value in ordered]
@@ -570,8 +581,13 @@ def plot_spread_constructions(panel: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def plot_spread_with_zscore(spread_bp: pd.Series, path: Path) -> None:
-    """The recommended spread and its z-score -- what issues #4 and #5 consume.
+def plot_spread_with_zscore(
+    spread: pd.Series,
+    path: Path,
+    units: str = "bp",
+    title: str = "ZQ/SR3 spread (OLS residual, rate space) and rolling z-score",
+) -> None:
+    """A pair's spread and its z-score -- what issues #4 and #5 consume.
 
     The z-score uses a rolling window rather than the full-sample mean and
     standard deviation, because the spread's dispersion is not stable (see
@@ -579,14 +595,14 @@ def plot_spread_with_zscore(spread_bp: pd.Series, path: Path) -> None:
     2022 and would essentially never fire in 2021.
     """
     window = ROLLING_WINDOW // 2
-    z_score = (spread_bp - spread_bp.rolling(window).mean()) / spread_bp.rolling(window).std()
+    z_score = (spread - spread.rolling(window).mean()) / spread.rolling(window).std()
 
     fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
 
-    ax_top.plot(spread_bp.index, spread_bp.to_numpy(), linewidth=0.9, color="#2c3e50")
+    ax_top.plot(spread.index, spread.to_numpy(), linewidth=0.9, color="#2c3e50")
     ax_top.axhline(0, color="grey", linestyle="--", linewidth=1)
-    ax_top.set_ylabel("Spread (bp)")
-    ax_top.set_title("ZQ/SR3 spread (OLS residual, rate space) and rolling z-score")
+    ax_top.set_ylabel(f"Spread ({units})")
+    ax_top.set_title(title)
     ax_top.grid(alpha=0.25)
 
     ax_bottom.plot(z_score.index, z_score.to_numpy(), linewidth=0.9, color="#2c7fb8")
@@ -604,9 +620,9 @@ def plot_spread_with_zscore(spread_bp: pd.Series, path: Path) -> None:
 def plot_rolling_beta(panel: pd.DataFrame, pairs: list[tuple[str, str]], path: Path) -> None:
     """Rolling hedge ratio for every pair -- the stability check.
 
-    A flat line supports a single static hedge ratio. ZQ/SR3's line is not flat:
-    it swings from -0.46 to +2.40. That is the argument for the time-varying
-    model the README lists as an optional extension.
+    A flat line supports a single static hedge ratio. CL/BZ's line is close to
+    flat (0.74-1.14); ZQ/SR3's swings from -0.46 to +2.40, the argument for a
+    time-varying model had that pair been chosen.
 
     CL/HO's beta is around 23 (crude in $/bbl against heating oil in $/gal) and
     would compress every other line to a flat streak, so the y-axis is clipped.
@@ -659,9 +675,9 @@ def main() -> None:
     robustness.to_csv(TABLES_DIR / "cointegration_robustness.csv")
     print("\n=== ENGLE-GRANGER p-VALUE BY SUBSAMPLE START ===")
     print(robustness.to_string(float_format=lambda v: f"{v:.4f}"))
-    print("  NOTE: every pair fails from 2023 onward, including ZQ/SR3 (0.0003 -> 0.23).")
-    print("  ZQ/SR3 is still the strongest candidate, but cointegration is a claim about")
-    print("  2018-2021, not about today. Issue #4 should not assume it holds out of sample.")
+    print("  NOTE: CL/BZ is the only pair that stays under p = 0.05 on every window.")
+    print("  ZQ/SR3 fails from 2023 (p = 0.23): its cointegration is a claim about")
+    print("  2018-2021, not about today.")
 
     constructions = compare_spread_constructions(panel)
     constructions.to_csv(TABLES_DIR / "spread_constructions.csv")
@@ -675,6 +691,11 @@ def main() -> None:
     print(yearly.to_string(float_format=lambda v: f"{v:.2f}"))
     print("  ~1.5bp in 2021 against ~40bp in 2022: a static z-score threshold will not work.")
 
+    yearly_cl_bz = spread_volatility_by_year(panel, "CL", "BZ", scale=1.0)
+    yearly_cl_bz.to_csv(TABLES_DIR / "spread_vol_by_year_cl_bz.csv")
+    print("\n=== CL/BZ SPREAD STANDARD DEVIATION BY YEAR ($/bbl) ===")
+    print(yearly_cl_bz.to_string(float_format=lambda v: f"{v:.2f}"))
+
     plot_normalised_levels(panel, FIGURES_DIR / "01_levels_rebased.png")
     plot_change_correlation(panel, FIGURES_DIR / "02_change_correlation.png")
     plot_staleness(coverage, FIGURES_DIR / "03_staleness.png")
@@ -684,10 +705,19 @@ def main() -> None:
     _, spread = analyse_pair(panel, "ZQ", "SR3")
     plot_spread_with_zscore(spread * BP_PER_PRICE_POINT, FIGURES_DIR / "06_spread_zq_sr3.png")
 
+    _, spread_cl_bz = analyse_pair(panel, "CL", "BZ")
+    plot_spread_with_zscore(
+        spread_cl_bz,
+        FIGURES_DIR / "07_spread_cl_bz.png",
+        units="$/bbl",
+        title="CL/BZ spread (OLS residual, price space) and rolling z-score",
+    )
+
     print(f"\nFigures -> {FIGURES_DIR}")
     print(f"Tables   -> {TABLES_DIR}")
-    print("\nRECOMMENDATION: ZQ/SR3 -- best available, but not unconditionally good.")
-    print("See docs/pair_selection.md for the four caveats and what they mean for issue #4.")
+    print("\nRECOMMENDATION: CL/BZ (WTI vs Brent) -- the only pair cointegrated on every")
+    print("subsample window, shortest half-life (4.1d), beta ~ 1, no DV01 dilemma.")
+    print("See docs/pair_selection.md for the full comparison and the ZQ/SR3 runner-up.")
 
 
 if __name__ == "__main__":

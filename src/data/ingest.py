@@ -28,7 +28,9 @@ SCHEMA = "statistics"  # carries CME's official settlement prices (ohlcv-1d clos
 
 # Candidate futures roots from issue #3's pair-selection shortlist:
 # ZQ/SR3 = Fed Funds vs SOFR, ZT/ZF/ZN/ZB = Treasury curve, CL/HO = crude vs heating oil.
-ROOTS = ["ZQ", "SR3", "ZT", "ZF", "ZN", "ZB", "CL", "HO"]
+# BZ = CME Brent Last Day Financial (cash-settled vs the ICE Brent Index), so
+# CL/BZ = WTI vs Brent without needing a second Databento dataset for ICE.
+ROOTS = ["ZQ", "SR3", "ZT", "ZF", "ZN", "ZB", "CL", "HO", "BZ"]
 
 RAW_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
 PROCESSED_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"

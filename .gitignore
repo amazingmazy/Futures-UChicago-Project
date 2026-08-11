@@ -12,6 +12,9 @@ wheels/
 .env
 .DS_Store
 
+# Claude Code local state
+.claude/
+
 # Data (keep folder structure, ignore contents)
 data/raw/*
 data/processed/*

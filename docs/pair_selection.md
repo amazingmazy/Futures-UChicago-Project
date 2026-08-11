@@ -215,7 +215,7 @@ the 2014-12-31 session.
 ```bash
 uv run python -m src.data.ingest                      # statistics schema, 9 roots; 1-5h depending on connection, resumable
 uv run python -m src.analysis.exploratory_analysis    # ~40s, reads the saved settlement panel
-uv run pytest tests/ -q                               # 20 tests, no API key needed
+uv run pytest tests/ -q                               # full suite, no API key needed
 ```
 
 Ingestion needs `DATABENTO_API_KEY` in `.env`; already-downloaded roots are

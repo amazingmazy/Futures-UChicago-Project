@@ -106,7 +106,7 @@ The open GitHub issues define the project roadmap:
 
 ## Repository Structure
 
-The intended/draft repository structure is:
+The repository structure is:
 
 ```text
 Futures-UChicago-Project/
@@ -122,37 +122,28 @@ Futures-UChicago-Project/
 │   ├── raw/
 │   └── processed/
 │
-├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_pair_selection.ipynb
-│   └── 03_strategy_backtest.ipynb
-│
 ├── src/
-│   ├── data/
-│   │   └── pull_databento.py
-│   ├── analysis/
-│   │   └── exploratory_analysis.py
-│   ├── models/
-│   │   └── spread_model.py
-│   ├── strategy/
-│   │   └── backtest.py
-│   └── utils/
-│       └── config.py
+│   ├── data/            # ingest.py (Databento pull), panel.py (shared paths/loader)
+│   ├── analysis/        # exploratory_analysis.py (EDA, pair selection)
+│   ├── models/          # spread.py, seasonality.py
+│   └── strategy/        # signals.py, backtest.py, walkforward_beta.py,
+│                        # run_zq_sr3.py, portfolio.py, risk_overlay.py, regime.py
+│
+├── tests/               # fully synthetic pytest suite
 │
 ├── outputs/
-│   ├── figures/
-│   └── tables/
+│   ├── figures/         # 26 numbered PNGs, committed
+│   └── tables/          # 23 CSVs, committed
 │
 ├── references/
 │
-└── docs/
+└── docs/                # per-stage writeups: pair_selection, spread_model,
+                         # signals, backtest
 ```
 
 The exact structure may change as the project develops, but the goal is to keep the analysis modular rather than placing everything in one notebook.
 
 ## How to Run the Project
-
-These instructions are aspirational for the initial project setup and will be updated as the repository develops.
 
 ### 1. Clone the repository
 
@@ -187,29 +178,42 @@ DATABENTO_API_KEY=your_api_key_here
 
 Do not commit `.env` to GitHub.
 
-### 4. Pull or prepare the data
-
-The final command may change, but the intended workflow is:
+### 4. Pull the data
 
 ```bash
-uv run python -m src.data.pull_databento
+uv run python -m src.data.ingest
 ```
 
-This should download or update the relevant futures data and store it in the local `data/` folder.
+This pulls continuous daily settlement prices for all nine futures roots from Databento into `data/raw/` and writes the processed price panel to `data/processed/continuous_settlement_prices.parquet`. The `data/` folder is gitignored, so this step must be run once locally before any analysis stage. The pull is resumable: roots whose raw files already exist are skipped.
 
 ### 5. Run the analysis
 
-The intended workflow is:
+Run the stages in this order. Each stage reads the saved outputs of earlier stages, not the Databento API.
 
 ```bash
-uv run python -m src.analysis.exploratory_analysis
-uv run python -m src.models.spread_model
-uv run python -m src.strategy.backtest
+uv run python -m src.analysis.exploratory_analysis   # EDA and pair selection tables/figures
+uv run python -m src.models.spread                   # CL/BZ hedge ratio and spread artifacts
+uv run python -m src.strategy.signals                # z-score entry/exit signals
+uv run python -m src.strategy.backtest               # PnL, costs, threshold sweep, walk-forward
+uv run python -m src.strategy.walkforward_beta       # per-fold hedge-ratio refit
+uv run python -m src.strategy.run_zq_sr3             # ZQ/SR3 second-pair comparison
+uv run python -m src.strategy.portfolio              # combines the two pairs (needs the two lines above)
+uv run python -m src.strategy.risk_overlay           # vol-target and drawdown-gate overlays
+uv run python -m src.strategy.regime                 # vol-regime position sizing
+uv run python -m src.models.seasonality              # walk-forward monthly seasonality
 ```
 
-The notebooks in `notebooks/` may also be used to reproduce exploratory plots and intermediate findings.
+The full downstream run takes under a minute on the daily panel.
 
-### 6. Review outputs
+### 6. Run the tests
+
+```bash
+uv run pytest
+```
+
+The test suite is fully synthetic: it needs no Databento key and no downloaded data, so it can be run on a fresh clone before anything else.
+
+### 7. Review outputs
 
 Final figures and tables should be saved in:
 

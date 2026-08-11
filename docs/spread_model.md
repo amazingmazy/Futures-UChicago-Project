@@ -217,5 +217,5 @@ on new prices it gives the value the strategy monitors.
 ```bash
 uv run python -m src.data.ingest         # once: 9 roots from Databento (needs DATABENTO_API_KEY)
 uv run python -m src.models.spread       # ~10s: fits, writes artifacts, figures 08-09, tables
-uv run pytest tests/ -q                  # 31 tests, synthetic fixtures, no API key needed
+uv run pytest tests/ -q                  # full suite, synthetic fixtures, no API key needed
 ```

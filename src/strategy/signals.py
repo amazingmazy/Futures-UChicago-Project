@@ -300,7 +300,7 @@ def main() -> None:
     print(f"\nSignals -> {SIGNALS_PATH}")
     print(f"Summary -> {TABLES_DIR / 'signal_summary.csv'}")
     print(f"Figure  -> {FIGURES_DIR / '10_cl_bz_signals.png'}")
-    print("\nNext (issue #6): apply next_session_position to spread returns and evaluate PnL.")
+    print("\nNext stage: uv run python -m src.strategy.backtest (executes these signals and evaluates PnL).")
 
 
 if __name__ == "__main__":

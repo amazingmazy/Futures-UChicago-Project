@@ -33,7 +33,8 @@ Run with::
 Outputs:
 
 * ``outputs/tables/monthly_seasonality_summary.csv`` -- full-sample fit,
-  explicitly descriptive only (see ``docs/seasonality.md``).
+  explicitly descriptive only (the walk-forward table below is the honest
+  result; the full-sample fit uses information no trading rule could have).
 * ``outputs/tables/seasonality_walkforward.csv`` -- one row per fold: that
   fold's own (expanding-window) monthly effects, p-values, and which months
   were flagged significant.
@@ -326,7 +327,7 @@ def main() -> None:
     print(f"\nMonthly summary -> {MONTHLY_SUMMARY_PATH}")
     print(f"Walk-forward    -> {WALKFORWARD_PATH}")
     print(f"Figures         -> {FIGURES_DIR}")
-    print("\nSee docs/seasonality.md for the write-up.")
+    print("\nSee this module's docstring for the methodology write-up.")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ fetch_continuous_daily() returns before trusting it in main().
 
 import pandas as pd
 
-from ingest import fetch_continuous_daily, get_client
+from src.data.ingest import fetch_continuous_daily, get_client
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)

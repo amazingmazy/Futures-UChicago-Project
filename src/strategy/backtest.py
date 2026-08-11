@@ -178,7 +178,7 @@ def run_backtest(
     the *same* value is also passed to ``reference_notional_usd`` for the
     percentage-based metrics -- only the absolute dollar figures move. For a
     pair whose two legs have different dollar-per-point values (e.g. ZQ/SR3,
-    see ``docs/second_pair_and_portfolio.md``), this is necessarily an
+    see the ``src.strategy.run_zq_sr3`` docstring), this is necessarily an
     approximation using one leg's reference value, not a resolution of that
     pair's own documented DV01 mismatch.
     """

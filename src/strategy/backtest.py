@@ -158,7 +158,10 @@ def compute_turnover(next_session_position: pd.Series) -> pd.Series:
 
 
 def run_backtest(
-    signals: pd.DataFrame, model: SpreadModel, cost_config: CostConfig = CostConfig()
+    signals: pd.DataFrame,
+    model: SpreadModel,
+    cost_config: CostConfig = CostConfig(),
+    contract_size: float = CONTRACT_SIZE_BBL,
 ) -> pd.DataFrame:
     """Turn a signal table into daily PnL, costs, and cumulative equity.
 
@@ -166,7 +169,18 @@ def run_backtest(
     (needs ``<leg_y>``, ``<leg_x>``, ``spread``, ``next_session_position``,
     lowercased leg names matching ``model.leg_y``/``model.leg_x``). Since
     ``spread = leg_y - alpha - beta*leg_x`` with ``alpha`` constant,
-    ``position * spread.diff()`` is exactly the dollar PnL of the hedged book.
+    ``position * spread.diff()`` is exactly the dollar PnL of the hedged book,
+    up to the ``contract_size`` dollar-per-point multiplier of one ``leg_y``
+    lot (default: CL/BZ's 1,000 bbl/$-per-bbl contract).
+
+    ``contract_size`` is a units choice, not a modeling one: Sharpe, percent
+    returns, and percent drawdown are all scale-invariant to it as long as
+    the *same* value is also passed to ``reference_notional_usd`` for the
+    percentage-based metrics -- only the absolute dollar figures move. For a
+    pair whose two legs have different dollar-per-point values (e.g. ZQ/SR3,
+    see ``docs/second_pair_and_portfolio.md``), this is necessarily an
+    approximation using one leg's reference value, not a resolution of that
+    pair's own documented DV01 mismatch.
     """
     leg_y_col = model.leg_y.lower()
     leg_x_col = model.leg_x.lower()
@@ -180,10 +194,10 @@ def run_backtest(
 
     frame = signals.copy()
     position = frame["next_session_position"].astype(float)
-    notional = contract_notional_usd(frame[leg_y_col], frame[leg_x_col], model.beta)
+    notional = contract_notional_usd(frame[leg_y_col], frame[leg_x_col], model.beta, contract_size)
     turnover = compute_turnover(frame["next_session_position"])
 
-    gross_pnl = position * frame["spread"].diff() * CONTRACT_SIZE_BBL
+    gross_pnl = position * frame["spread"].diff() * contract_size
     if cost_config.apply_costs:
         transaction_cost = turnover * cost_config.transaction_cost_bps / 1e4 * notional
         financing_cost = position.abs() * cost_config.financing_bps_per_day / 1e4 * notional
@@ -208,16 +222,20 @@ def run_backtest(
 # --------------------------------------------------------------------------
 
 
-def reference_notional_usd(spread_frame: pd.DataFrame, model: SpreadModel) -> float:
+def reference_notional_usd(
+    spread_frame: pd.DataFrame, model: SpreadModel, contract_size: float = CONTRACT_SIZE_BBL
+) -> float:
     """Fixed normalization denominator for "percent return" figures.
 
     The mean full-sample two-leg gross notional. Used everywhere a dollar PnL
     is expressed as a percentage so every reported percentage shares one
-    documented denominator -- explicitly not a margin or capital claim.
+    documented denominator -- explicitly not a margin or capital claim. Pass
+    the same ``contract_size`` used for the corresponding ``run_backtest``
+    call so percentage-based metrics stay internally consistent.
     """
     leg_y = spread_frame[model.leg_y.lower()]
     leg_x = spread_frame[model.leg_x.lower()]
-    return float(contract_notional_usd(leg_y, leg_x, model.beta).mean())
+    return float(contract_notional_usd(leg_y, leg_x, model.beta, contract_size).mean())
 
 
 def sharpe_ratio(daily_pnl: pd.Series, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> float:
@@ -384,6 +402,7 @@ def build_grid_frames(
     exit_grid: tuple[float, ...] = EXIT_Z_GRID,
     window: int = DEFAULT_ZSCORE_WINDOW,
     cost_config: CostConfig = CostConfig(),
+    contract_size: float = CONTRACT_SIZE_BBL,
 ) -> dict[tuple[float, float], pd.DataFrame]:
     """Run the full backtest once per valid ``(entry_z, exit_z)`` combo on the
     full sample. Computed once and reused by both the in-sample grid summary
@@ -397,7 +416,7 @@ def build_grid_frames(
                 continue
             config = SignalConfig(window=window, entry_z=entry_z, exit_z=exit_z)
             signals = generate_signals(spread_frame, model, config)
-            frames[(entry_z, exit_z)] = run_backtest(signals, model, cost_config)
+            frames[(entry_z, exit_z)] = run_backtest(signals, model, cost_config, contract_size)
     return frames
 
 
@@ -545,6 +564,7 @@ def run_walkforward(
     window: int = DEFAULT_ZSCORE_WINDOW,
     cost_config: CostConfig = CostConfig(),
     grid_frames: dict[tuple[float, float], pd.DataFrame] | None = None,
+    contract_size: float = CONTRACT_SIZE_BBL,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Walk-forward expanding-window selection of ``(entry_z, exit_z)``.
 
@@ -557,9 +577,11 @@ def run_walkforward(
     cannot be affected by anything dated after the fold's test window.
     """
     if grid_frames is None:
-        grid_frames = build_grid_frames(spread_frame, model, entry_grid, exit_grid, window, cost_config)
+        grid_frames = build_grid_frames(
+            spread_frame, model, entry_grid, exit_grid, window, cost_config, contract_size
+        )
 
-    reference_notional = reference_notional_usd(spread_frame, model)
+    reference_notional = reference_notional_usd(spread_frame, model, contract_size)
     folds = build_walkforward_folds(spread_frame.index, MIN_TRAIN_SESSIONS, MIN_TEST_SESSIONS)
 
     fold_rows = []

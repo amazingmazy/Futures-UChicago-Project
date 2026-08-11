@@ -1,0 +1,17 @@
+,value
+config_window,126
+config_min_periods,
+config_entry_z,1.5
+config_exit_z,0.5
+config_lag_rolling_stats,True
+sample_start,2018-04-27
+sample_end,2026-06-30
+n_sessions,1639
+n_scored_sessions,1513
+n_entries,15
+n_long_entries,8
+n_short_entries,7
+n_exits,15
+pct_time_in_market,0.29835265405735206
+mean_abs_entry_zscore,4.033930389157651
+final_target_position,0

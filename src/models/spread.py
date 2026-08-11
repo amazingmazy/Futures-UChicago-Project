@@ -246,13 +246,18 @@ def load_spread(path: Path = SPREAD_PATH) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 
 
-def plot_fit_scatter(frame: pd.DataFrame, model: SpreadModel, path: Path) -> None:
+def plot_fit_scatter(
+    frame: pd.DataFrame, model: SpreadModel, path: Path, unit_label: str = "$/bbl"
+) -> None:
     """The fitted relationship itself: leg_y against leg_x with the OLS line.
 
     The one CL/BZ view no EDA figure shows. The April-2020 negative-WTI
     points sit far below the line (Brent stayed near $25 while WTI settled
     at -$37.63) -- the largest deviation in the sample, and the reason the
     model lives in price space: log prices do not exist at -$37.
+
+    ``unit_label`` defaults to CL/BZ's units; pass e.g. ``"rate, %"`` for a
+    pair modeled in a different space (see ``src.strategy.run_zq_sr3``).
     """
     y = frame[model.leg_y.lower()]
     x = frame[model.leg_x.lower()]
@@ -270,8 +275,8 @@ def plot_fit_scatter(frame: pd.DataFrame, model: SpreadModel, path: Path) -> Non
             f"   (R$^2$ = {model.r_squared:.3f})"
         ),
     )
-    ax.set_xlabel(f"{model.leg_x} settlement ($/bbl)")
-    ax.set_ylabel(f"{model.leg_y} settlement ($/bbl)")
+    ax.set_xlabel(f"{model.leg_x} settlement ({unit_label})")
+    ax.set_ylabel(f"{model.leg_y} settlement ({unit_label})")
     ax.set_title(
         f"{model.leg_y}/{model.leg_x} static OLS fit, "
         f"{model.sample_start} to {model.sample_end} (n = {model.n_obs})"

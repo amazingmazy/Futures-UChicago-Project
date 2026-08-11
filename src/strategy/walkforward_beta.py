@@ -49,6 +49,7 @@ import pandas as pd
 from src.data.panel import FIGURES_DIR, PROCESSED_DIR, TABLES_DIR, drop_sunday_session, load_panel
 from src.models.spread import SpreadModel, fit_spread_model, load_model, load_spread
 from src.strategy.backtest import (
+    CONTRACT_SIZE_BBL,
     CostConfig,
     ENTRY_Z_GRID,
     EXIT_Z_GRID,
@@ -130,6 +131,7 @@ def run_walkforward_beta_refit(
     reference_notional: float | None = None,
     min_train_sessions: int = MIN_TRAIN_SESSIONS,
     min_test_sessions: int = MIN_TEST_SESSIONS,
+    contract_size: float = CONTRACT_SIZE_BBL,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[BetaRefitFold]]:
     """Walk-forward selection of ``(entry_z, exit_z)`` *and* the hedge ratio.
 
@@ -145,14 +147,17 @@ def run_walkforward_beta_refit(
     purely as a fixed reporting denominator for percentage-based metrics --
     it does not affect Sharpe (scale-invariant) or which config wins any
     fold, so it introduces no leakage. Pass in the same value used elsewhere
-    in ``backtest_summary.csv`` to keep rows comparable.
+    in ``backtest_summary.csv`` to keep rows comparable. ``contract_size`` is
+    the same units choice documented on ``backtest.run_backtest`` -- pass a
+    pair-appropriate value (e.g. one leg's DV01 for a rate pair) rather than
+    the CL/BZ-specific default when this isn't CL/BZ.
     """
     both_index = panel[[leg_y, leg_x]].dropna().index
     folds = build_walkforward_folds(both_index, min_train_sessions, min_test_sessions)
 
     if reference_notional is None:
         full_model, full_frame = fit_spread_model(panel[[leg_y, leg_x]].dropna(), leg_y, leg_x)
-        reference_notional = reference_notional_usd(full_frame, full_model)
+        reference_notional = reference_notional_usd(full_frame, full_model, contract_size)
 
     fold_rows = []
     oos_slices = []
@@ -160,7 +165,7 @@ def run_walkforward_beta_refit(
     for fold in folds:
         fold_model, fold_spread_frame = build_fold_spread_frame(panel, leg_y, leg_x, fold)
         grid_frames_fold = build_grid_frames(
-            fold_spread_frame, fold_model, entry_grid, exit_grid, window, cost_config
+            fold_spread_frame, fold_model, entry_grid, exit_grid, window, cost_config, contract_size
         )
         fold_scores = score_fold_configs(grid_frames_fold, fold, reference_notional, cost_config)
         entry_z, exit_z = select_fold_winner(fold_scores)

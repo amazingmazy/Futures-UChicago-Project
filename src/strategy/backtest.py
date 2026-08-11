@@ -132,9 +132,9 @@ class Fold:
 
 
 def contract_notional_usd(
-    cl: pd.Series, bz: pd.Series, beta: float, contract_size: float = CONTRACT_SIZE_BBL
+    leg_y: pd.Series, leg_x: pd.Series, beta: float, contract_size: float = CONTRACT_SIZE_BBL
 ) -> pd.Series:
-    """Gross two-leg notional in dollars: ``(|CL| + beta*|BZ|) * contract_size``.
+    """Gross two-leg notional in dollars: ``(|leg_y| + beta*|leg_x|) * contract_size``.
 
     Uses absolute value deliberately: CL settled at -$37.63 on 2020-04-20, and
     a signed notional there would be economically meaningless. This is a
@@ -143,7 +143,7 @@ def contract_notional_usd(
     in docs/backtest.md (this repo has no order-book depth data to size real
     capacity).
     """
-    return (cl.abs() + beta * bz.abs()) * contract_size
+    return (leg_y.abs() + beta * leg_x.abs()) * contract_size
 
 
 def compute_turnover(next_session_position: pd.Series) -> pd.Series:
@@ -163,14 +163,24 @@ def run_backtest(
     """Turn a signal table into daily PnL, costs, and cumulative equity.
 
     ``signals`` must be the output of ``src.strategy.signals.generate_signals``
-    (needs ``cl``, ``bz``, ``spread``, ``next_session_position``). Since
-    ``spread = CL - alpha - beta*BZ`` with ``alpha`` constant,
-    ``position * spread.diff()`` is exactly the dollar PnL of the hedged
-    CL/BZ book.
+    (needs ``<leg_y>``, ``<leg_x>``, ``spread``, ``next_session_position``,
+    lowercased leg names matching ``model.leg_y``/``model.leg_x``). Since
+    ``spread = leg_y - alpha - beta*leg_x`` with ``alpha`` constant,
+    ``position * spread.diff()`` is exactly the dollar PnL of the hedged book.
     """
+    leg_y_col = model.leg_y.lower()
+    leg_x_col = model.leg_x.lower()
+    missing = [c for c in (leg_y_col, leg_x_col) if c not in signals.columns]
+    if missing:
+        raise KeyError(
+            f"signals is missing leg column(s) {missing} for model legs "
+            f"{model.leg_y}/{model.leg_x}; did you call generate_signals with "
+            "a spread_frame that carries both leg price columns?"
+        )
+
     frame = signals.copy()
     position = frame["next_session_position"].astype(float)
-    notional = contract_notional_usd(frame["cl"], frame["bz"], model.beta)
+    notional = contract_notional_usd(frame[leg_y_col], frame[leg_x_col], model.beta)
     turnover = compute_turnover(frame["next_session_position"])
 
     gross_pnl = position * frame["spread"].diff() * CONTRACT_SIZE_BBL
@@ -205,7 +215,9 @@ def reference_notional_usd(spread_frame: pd.DataFrame, model: SpreadModel) -> fl
     is expressed as a percentage so every reported percentage shares one
     documented denominator -- explicitly not a margin or capital claim.
     """
-    return float(contract_notional_usd(spread_frame["cl"], spread_frame["bz"], model.beta).mean())
+    leg_y = spread_frame[model.leg_y.lower()]
+    leg_x = spread_frame[model.leg_x.lower()]
+    return float(contract_notional_usd(leg_y, leg_x, model.beta).mean())
 
 
 def sharpe_ratio(daily_pnl: pd.Series, periods_per_year: int = TRADING_DAYS_PER_YEAR) -> float:
@@ -605,7 +617,7 @@ def load_backtest(path: Path = BACKTEST_PATH) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 
 
-def plot_threshold_heatmap(grid_summary: pd.DataFrame, path: Path) -> None:
+def plot_threshold_heatmap(grid_summary: pd.DataFrame, path: Path, pair_label: str = "CL/BZ") -> None:
     """Entry/exit threshold sensitivity, in-sample, full sample only."""
     pivot = grid_summary.pivot(index="entry_z", columns="exit_z", values="sharpe_net")
     fig, ax = plt.subplots(figsize=(9, 7))
@@ -622,7 +634,7 @@ def plot_threshold_heatmap(grid_summary: pd.DataFrame, path: Path) -> None:
     ax.set_xlabel("exit_z")
     ax.set_ylabel("entry_z")
     ax.set_title(
-        "CL/BZ threshold grid: net Sharpe, in-sample, full sample\n"
+        f"{pair_label} threshold grid: net Sharpe, in-sample, full sample\n"
         "(descriptive only -- see the walk-forward section for the honest result)"
     )
     fig.colorbar(im, ax=ax, label="net Sharpe")
@@ -637,6 +649,8 @@ def plot_walkforward_equity(
     baseline_frame: pd.DataFrame,
     best_insample_frame: pd.DataFrame,
     path: Path,
+    pair_label: str = "CL/BZ",
+    highlight_date: pd.Timestamp | None = pd.Timestamp("2020-04-20"),
 ) -> None:
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(oos_frame.index, oos_frame["net_cum_pnl_usd"], linewidth=1.6, label="walk-forward OOS (headline)")
@@ -654,11 +668,12 @@ def plot_walkforward_equity(
         linestyle=":",
         label="best in-sample config, full sample, in-sample",
     )
-    negative_wti_date = pd.Timestamp("2020-04-20", tz=oos_frame.index.tz)
-    if oos_frame.index.min() <= negative_wti_date <= oos_frame.index.max():
-        ax.axvline(negative_wti_date, color="#c0392b", linewidth=0.8, alpha=0.6)
+    if highlight_date is not None:
+        highlight = pd.Timestamp(highlight_date, tz=oos_frame.index.tz)
+        if oos_frame.index.min() <= highlight <= oos_frame.index.max():
+            ax.axvline(highlight, color="#c0392b", linewidth=0.8, alpha=0.6)
     ax.set_ylabel("cumulative net PnL ($)")
-    ax.set_title("CL/BZ backtest: walk-forward out-of-sample vs. in-sample configs")
+    ax.set_title(f"{pair_label} backtest: walk-forward out-of-sample vs. in-sample configs")
     ax.legend(fontsize=9)
     ax.grid(alpha=0.25)
     fig.tight_layout()
@@ -667,7 +682,9 @@ def plot_walkforward_equity(
     plt.close(fig)
 
 
-def plot_walkforward_threshold_stability(walkforward_table: pd.DataFrame, path: Path) -> None:
+def plot_walkforward_threshold_stability(
+    walkforward_table: pd.DataFrame, path: Path, pair_label: str = "CL/BZ"
+) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     x = range(len(walkforward_table))
     ax.step(x, walkforward_table["selected_entry_z"], where="mid", marker="o", label="selected entry_z")
@@ -675,7 +692,7 @@ def plot_walkforward_threshold_stability(walkforward_table: pd.DataFrame, path: 
     ax.set_xticks(list(x))
     ax.set_xticklabels(walkforward_table["test_start"], rotation=45, ha="right")
     ax.set_ylabel("z-score threshold")
-    ax.set_title("CL/BZ walk-forward: selected thresholds by fold")
+    ax.set_title(f"{pair_label} walk-forward: selected thresholds by fold")
     ax.legend(fontsize=9)
     ax.grid(alpha=0.25)
     fig.tight_layout()

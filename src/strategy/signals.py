@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 
 from src.data.panel import FIGURES_DIR, PROCESSED_DIR, TABLES_DIR
-from src.models.spread import LEG_X, LEG_Y, SpreadModel, load_model, load_spread
+from src.models.spread import SpreadModel, load_model, load_spread
 
 # --------------------------------------------------------------------------
 # Constants
@@ -253,7 +253,7 @@ def load_signals(path: Path = SIGNALS_PATH) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def plot_signals(signals: pd.DataFrame, config: SignalConfig, path: Path) -> None:
+def plot_signals(signals: pd.DataFrame, config: SignalConfig, path: Path, model: SpreadModel) -> None:
     """Plot rolling z-score with entry/exit markers for review."""
     fig, ax = plt.subplots(figsize=(12, 5.5))
     ax.plot(signals.index, signals["zscore"], linewidth=1.0, label="rolling z-score")
@@ -270,7 +270,7 @@ def plot_signals(signals: pd.DataFrame, config: SignalConfig, path: Path) -> Non
     ax.scatter(short_entries.index, short_entries["zscore"], marker="v", s=36, label="short-spread entry")
     ax.scatter(exits.index, exits["zscore"], marker="x", s=30, label="exit")
 
-    ax.set_title(f"{LEG_Y}/{LEG_X} rolling z-score signal rule")
+    ax.set_title(f"{model.leg_y}/{model.leg_x} rolling z-score signal rule")
     ax.set_ylabel("z-score")
     ax.grid(alpha=0.25)
     ax.legend(fontsize=9, ncols=2)
@@ -293,7 +293,7 @@ def main() -> None:
 
     summary = summarize_signals(signals, config)
     summary.to_csv(TABLES_DIR / "signal_summary.csv", header=True)
-    plot_signals(signals, config, FIGURES_DIR / "10_cl_bz_signals.png")
+    plot_signals(signals, config, FIGURES_DIR / "10_cl_bz_signals.png", model)
 
     print("=== SIGNAL GENERATION (rolling z-score mean reversion) ===")
     print(summary.to_string())

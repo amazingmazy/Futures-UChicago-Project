@@ -27,7 +27,13 @@ def test_build_fold_spread_frame_beta_matches_manual_ols_on_train_only() -> None
     before = idx < boundary
     true_beta = np.where(before, 2.0, -1.0)
     true_alpha = np.where(before, 5.0, 50.0)
-    y = pd.Series(true_alpha + true_beta * x.to_numpy(), index=idx)
+    # Noise is required: with an exactly colinear y, the OLS residuals are
+    # identically zero and fit_spread_model's ADF diagnostic raises
+    # "Invalid input, x is constant".
+    y = pd.Series(
+        true_alpha + true_beta * x.to_numpy() + rng.normal(0, 0.05, size=len(idx)),
+        index=idx,
+    )
     panel = pd.DataFrame({"Y": y, "X": x})
 
     fold = Fold(

@@ -29,7 +29,7 @@ $$
 
 so it depends only on how CL and BZ move relative to each other, not on the outright direction of oil prices -- a genuine hedge, not just a naming convention.
 
-The signal is a rolling z-score of the spread over a 126-session window, with the rolling mean and volatility shifted one session so today's settlement never helps define the statistics it is judged against. Enter long or short the spread at $|z| \geq 1.5$, exit at $|z| \leq 0.5$, execute at the next session's settlement. Costs are 2 bps per trade plus 0.5 bps per day of financing, stated placeholders pending real fill data.
+The signal is a rolling z-score of the spread over a 126-session window, with the rolling mean and volatility shifted one session so today's settlement never helps define the statistics it is judged against. Enter long or short the spread at $|z| \geq 1.5$, exit at $|z| \leq 0.5$, execute at the next session's settlement. Costs are 2 bps per trade plus 0.5 bps per day of financing, an assumption to note.
 
 ## Results
 

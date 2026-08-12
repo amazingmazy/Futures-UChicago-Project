@@ -41,7 +41,7 @@ All numbers are net of costs, from the committed tables in `outputs/tables/`.
 
 ![Refit hedge ratio by fold](outputs/figures/14_cl_bz_walkforward_beta_stability.png)
 
-The refit hedge ratio stays in a tight 0.82-0.98 band across all ten folds -- confirmation that the small Sharpe delta above reflects a genuinely stable relationship, not a coincidence.
+The refit hedge ratio stays in a tight 0.82-0.98 band across all ten folds.
 
 ## What did not work
 
@@ -79,7 +79,7 @@ cp .env.example .env
 Then add your key to `.env`:
 
 ```text
-DATABENTO_API_KEY=your_api_key_here
+DATABENTO_API_KEY=db-XXXXXXXXXXXXXXXXXXXX
 ```
 
 Do not commit `.env`.
@@ -98,7 +98,7 @@ The test suite is fully synthetic, so it works on a fresh clone before any downl
 uv run python -m src.data.ingest
 ```
 
-This pulls continuous daily settlement prices for all nine roots into `data/raw/` and writes the processed panel to `data/processed/continuous_settlement_prices.parquet`. The `data/` folder is gitignored, so this step must run once locally. The pull is resumable: roots whose raw files already exist are skipped.
+This pulls continuous daily settlement prices for all nine roots into `data/raw/` and writes the processed panel to `data/processed/continuous_settlement_prices.parquet`. The `data/` folder is gitignored, so this step must run once locally. Expect **1-5 hours depending on connection**. Databento's streaming API occasionally drops a request mid-fetch (`BentoError: Response ended prematurely`); the pull is resumable, so just re-run the same command -- roots whose raw files already exist are skipped, so it picks up where it left off.
 
 ### 5. Run the core analysis
 
@@ -121,7 +121,7 @@ Not required for any number in the Results section; each is documented in its ow
 ```bash
 uv run python -m src.strategy.regime                 # vol-regime position sizing
 uv run python -m src.strategy.run_zq_sr3             # ZQ/SR3 second-pair comparison
-uv run python -m src.strategy.portfolio              # combines CL/BZ and ZQ/SR3 (needs run_zq_sr3 first)
+uv run python -m src.strategy.portfolio              # combines CL/BZ and ZQ/SR3 (needs run_zq_sr3 above, and walkforward_beta from the core steps)
 uv run python -m src.strategy.risk_overlay           # vol-target and drawdown-gate overlays
 uv run python -m src.models.seasonality              # walk-forward monthly seasonality
 ```

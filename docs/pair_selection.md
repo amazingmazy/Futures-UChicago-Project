@@ -158,6 +158,25 @@ policy regimes rather than reverting to a fixed level. ZN/ZB's marginal
 full-sample p = 0.046 collapses to 0.31–0.50 the moment the quiet 2015–17
 window is dropped — an artifact, not a relationship.
 
+**Data-coverage finding, added later.** Point 2's "2,052 usable days"
+reflects that panel as of when this doc was first written (2026-07-20).
+Re-fetching ZQ's settlement history since then — twice, independently —
+recovered a materially sparser 2018-2020 window (as few as 51 of ~252
+expected session-days in 2019, versus near-complete coverage in the original
+pull), pushing the ZQ/SR3 intersection down to roughly 1,639 days starting
+2018-04-27. This looks like genuine Databento data-availability variability
+for that specific historical window, not a bug in this repo's ingestion code
+— the same `settlement_series()` function recovers full coverage for every
+other year and every other root, including CL/BZ. It does not change the
+conclusion: ZQ/SR3's disqualifying problems (out-of-sample cointegration
+decay, the unresolved DV01 dilemma, an unstable hedge ratio) hold regardless
+of the exact day count, and CL/BZ's own numbers, which show no such gap, are
+unaffected — independently reverified against a fresh CL/BZ pull. See
+`src.analysis.exploratory_analysis`'s `PANEL_END_DATE` constant (2026-06-30,
+the last settled session in the panel as of this writing), added to at least
+pin the *end* of the analysis window between runs; the source data itself
+may still vary at the next fetch.
+
 ---
 
 ## Why settlement prices, not closes

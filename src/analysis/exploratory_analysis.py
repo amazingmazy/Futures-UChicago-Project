@@ -122,6 +122,21 @@ ROLLING_WINDOW = 252
 #: Basis points per unit of price for a ``100 - rate`` contract.
 BP_PER_PRICE_POINT = 100.0
 
+#: Fixed historical cutoff for this analysis, pinned rather than left as
+#: "whatever the most recent ingest happens to include." Two reasons: (1)
+#: general reproducibility -- re-running ``src.data.ingest`` at a later date
+#: should not silently change this module's published numbers just because
+#: more recent sessions have since settled; (2) concretely, ZQ's settlement
+#: coverage for 2018-2020 has been observed to vary between fetches of the
+#: same Databento statistics feed (one fetch recovered as few as 51 of ~252
+#: expected session-days for 2019; see the coverage discussion in
+#: ``docs/pair_selection.md``). Pinning the window doesn't erase that
+#: variability -- a re-fetch can still recover a different subset of that
+#: sparse period -- but it stops the *end* of the analysis from also moving.
+#: This is a market-data date (the last settled session in the panel as of
+#: this writing), not the date this module was last run.
+PANEL_END_DATE = "2026-06-30"
+
 
 # --------------------------------------------------------------------------
 # Loading and cleaning
@@ -630,10 +645,11 @@ def main() -> None:
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
 
     raw_panel = load_panel()
-    panel = drop_sunday_session(raw_panel)
+    panel = drop_sunday_session(raw_panel).loc[:PANEL_END_DATE]
     print(
         f"Panel: {raw_panel.shape[0]} rows -> {panel.shape[0]} after dropping "
-        f"{raw_panel.shape[0] - panel.shape[0]} Sunday-session rows"
+        f"Sunday-session rows and pinning to sessions through {PANEL_END_DATE} "
+        "(see PANEL_END_DATE docstring for why)"
     )
 
     coverage = coverage_report(panel)

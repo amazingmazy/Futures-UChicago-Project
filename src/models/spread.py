@@ -354,7 +354,7 @@ def main() -> None:
     print(f"Spread  -> {SPREAD_PATH}")
     print(f"Figures -> {FIGURES_DIR}")
     print(f"Tables  -> {TABLES_DIR}")
-    print("\nNext (issue #5): rolling z-score signals on the saved spread --")
+    print("\nNext stage: uv run python -m src.strategy.signals --")
     print("see docs/spread_model.md for the artifact contract.")
 
 

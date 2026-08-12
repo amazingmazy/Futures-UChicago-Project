@@ -9,8 +9,8 @@ rate-neutral; the rate-neutral spread isn't stationary), and a rolling hedge
 ratio that swings from -0.46 to +2.40. This script does **not** try to fix
 any of that. It exists to answer a different question -- issue #6's "final
 stretch" ask of whether trading a second, admittedly shakier pair alongside
-CL/BZ helps a combined portfolio (see ``src.strategy.portfolio`` and
-``docs/second_pair_and_portfolio.md``) -- and to demonstrate that already
+CL/BZ helps a combined portfolio (see ``src.strategy.portfolio``) -- and
+to demonstrate that already
 pair-agnostic pipeline code needs no duplication to answer it.
 
 Three things this script does differently from a copy-paste of the CL/BZ
@@ -28,7 +28,7 @@ scripts:
   dollar-per-point multiplier. This does **not** resolve the DV01 dilemma --
   SR3's DV01 is $25.00/bp, so the position is still not rate-neutral -- it
   only lets Sharpe/drawdown/correlation be computed and compared on a
-  consistent units choice. See ``docs/second_pair_and_portfolio.md``.
+  consistent units choice.
 * **Beta-refit walk-forward, not the static-beta version.** Given ZQ/SR3's
   own rolling beta is documented as unstable, reporting its walk-forward
   headline off a single full-sample-fit beta would be misleading for
@@ -204,7 +204,7 @@ def main() -> None:
     print(f"Walk-forward       -> {WALKFORWARD_BETA_PATH}")
     print(f"Tables             -> {TABLES_DIR}")
     print(f"Figures            -> {FIGURES_DIR}")
-    print("\nSee docs/second_pair_and_portfolio.md for the write-up, and")
+    print("\nSee this module's docstring for the methodology write-up, and")
     print("src.strategy.portfolio for combining this with CL/BZ.")
 
 

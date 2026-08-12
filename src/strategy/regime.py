@@ -218,7 +218,7 @@ def main() -> None:
 
     print(f"\nTable  -> {SUMMARY_PATH}")
     print(f"Figure -> {FIGURES_DIR / '24_regime_equity.png'}")
-    print("\nSee docs/risk_overlays.md for the write-up.")
+    print("\nSee this module's docstring for the methodology write-up.")
 
 
 if __name__ == "__main__":

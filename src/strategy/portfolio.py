@@ -239,7 +239,7 @@ def main() -> None:
 
     print(f"\nTable   -> {PORTFOLIO_TABLE_PATH}")
     print(f"Figure  -> {FIGURES_DIR / '22_portfolio_combined_equity.png'}")
-    print("\nSee docs/second_pair_and_portfolio.md for the write-up.")
+    print("\nSee this module's docstring for the methodology write-up.")
 
 
 if __name__ == "__main__":
